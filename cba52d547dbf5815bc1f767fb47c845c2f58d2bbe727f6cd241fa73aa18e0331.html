@@ -1,0 +1,87 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
+
+author: BFAE 6EFF 0531 6B0C 66B4  5D9C 3FE0 FA5D A593 079F<br />
+context: article<br />
+written early June 2015<br />
+
+
+<h1>Ballistic Rekt Edition update</h1>
+
+<p>This is a new version of Ballistic Rekt Edition. It includes new features as well as some changes to work with the chat changes in the new version (v4-3-4f1-rc-b200-r712) of Ballistic.</p>
+
+<p>Supposedly, the grenade explosion sizes were changed or something like that, but I can't be bothered to port that change to Ballistic Rekt Edition. Also, the Overhead map was changed. In Ballistic Rekt Edition, you'll still be using the original version of the map, so you'll see people floating in the air and you'll be able to go on the top left and right beams where other people can no longer go, and they'll see you appear to go through walls, etc. I could fix this but meh.</p>
+
+<p>They tried to fix server messages by removing them from the chat protocol. Chat messages are sent to an XMPP chat room which contains all the players in your match. The format was like this:</p>
+
+<pre>
+0[msg] None
+1[msg] Server
+2[msg] Public
+3[msg] TeamOnly
+4[msg] Private
+5[msg] Party
+</pre>
+
+<p>In the official game code, these numbers are derived from casting an enum <code>EsCustomMessage.Type</code> to/from an <code>int</code>. Public is for chatting to all players in the match, TeamOnly is for chatting to only your team, and Server was used for sending server messages. In the new version it's like this:</p>
+
+<pre>
+0[msg] None
+1[msg] Public
+2[msg] TeamOnly
+3[msg] Private
+4[msg] Party
+</pre>
+
+<p>So clients don't recognize server messages from chat anymore period. But since you can send colored messages using the format <code>[rrggbb]</code>, you can just send <code>0[00ff00][SERVER][ffffff] LOL I AM THE SERVER AGAIN</code>, and it looks exactly like the original server messages. Note the 0 (None) prefix code; Your name isn't shown in the message you send when using this code. I used this to make server messages work once again.</p>
+
+<h2>Installation</h2>
+<p>Install <a href="750602224faffeaf812ff2512e164e7ccefc5c8532868b5b6529b8f9e38327f9.html">Ballistic Rekt Edition</a>. Replace game.unity3d from Ballistic Rekt Edition with <a href="645fb6a7b026b8aa315adec85ef4cfa50e398d5f6b9c1040b2ba301a3b2367c4.unity3d">this</a> and name it game.unity3d</p>
+
+<h2>New Features</h2>
+
+<ul>
+  <li>New server message method</li>
+  <li>autoTeamSwapEvent (also alternate antikick)</li>
+  <li>Auto team switch</li>
+  <li>Autokill</li>
+  <li>No profanity filter</li>
+</ul>
+
+<h3>New server message method</h3>
+<p>Just select the "Server message" check box like before. There are some slight differences but it looks better now. Now the game hud chat box will show the [SERVER] in green before the message. In the previous version, the [SERVER] in green only appeared in the menu chat box.<h3>
+
+<h3>autoTeamSwapEvent</h3>
+<p>I didn't notice this before, but every time you do a SwapTeamEvent, every entry in the vote kick menu gets duplicated. autoTeamSwapEvent just automates sending SwapTeamEvents rapidly, which makes the votekick menu unusable. It's still possible for people to kick you, but it's very hard. The longer you have to votekick menu open, the more laggy it becomes / more memory taken. The duplicated entries in the votekick menu don't have kick buttons - only the original entry does. So the votekick buttons become needles in a haystack. When this is enabled, you can still kick people by copying their rum gukey from their player list entry to the text box below the "kik" button, selecting "yes vote", and pressing the "kik" button.</p>
+
+<video src="f7c1036c95ae850939beb086ea506151650191303c96399de203c7a7b7caeec5.mp4" controls></video>
+
+<p>The advantage to this is that unlike the other antikick feature, your score doesn't reset every time someone does a vote against you, and this doesn't force you to enable god mode. But now there's a new side effect: everyone spawns in the wrong base etc, like I mentioned in the original <a href= "750602224faffeaf812ff2512e164e7ccefc5c8532868b5b6529b8f9e38327f9.html">Ballistic rekt edition</a>. This feature is also useful for just trolling matches by making everyone constantly spawn in the wrong bases / get trapped in bases / get multicolored etc..</p>
+
+<h3>Auto team switch</h3>
+<p>The "autoTeamSwitch" check box. Constantly tries to switch teams. Seems to work better with autoTeamSwapEvent enabled.</p>
+
+<h3>Autokill</h3>
+<p>The "autokill" check box. This just automatically kills everyone in the game. It's equivalent to selecting H on each entry in the player list.</p>
+
+<h3>No profanity filter</h3>
+<p>The "noProfanityFilter" checkbox. It allows you to have profanity in your chat messages (everyone will see it). Like I said before profanity is checked only client side by the sender.</p>
+
+
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v2
+
+iQIcBAEBAgAGBQJVd2R8AAoJED/g+l2lkwefOSAP/1uq66yA378cjE93O8aumBdI
+J37KfREf/2fFCKIyeTNXIOQAiSdaa7WmokhVF7DZ/lBz3MuO0aFjzRfXSj2G23YQ
+kpZo4dTp8qTFuQenGIgU7P9Rrz2F0WTXy+EZI3bhJvooSbeaNjvtrqGsesIlUHkN
+PfoVZo4PNedUYDF80LmL24JB4WtyQmHM855XXF0fg2qlmCKzIORMDsNXAqySW2VI
+Gf0E4Imt3TV0MpJqUivyrIHwdvL404wGCq2KuMC2FVLqd6BGn5u0eMQAczEKNGEE
+JzEHvzvV4kZNlOkaOff/vVlxLbl2PosixoaQ3fgQfV9hncQLNgLH5Lw9RC1dxqck
+pkPyCcvpZreoIVklDJ9VuplZpQpRx5yuw7/meW+240ZxseifsCsMxAII0krVdaW+
+gXjcGzwcirXrDBC7Qm8LPe3DoSukpVTfRs+8WmP6h21GyEcQn8BMq3xxEUdZ1M/9
+twdbS5rPnFT4QmkowQNhT8wBSTwWUHxFUeZFRM9JP+Q5Jpn+8BXtARUXKc+JJxGv
+Y8mLRrlB2Lzdtb/6e+FCMUlnS3wtbjZckH2vBu+WZYKVEU/sl/YfACSRI5iQqj2o
+ZPLEfsAlBLikTq7mFSPbYsSSsrnaEUqCGFkK4mP1VBYwFiDcySN7lisN9gpFudKh
+QY0uzYxi0Nox07IxoSrb
+=0rLo
+-----END PGP SIGNATURE-----

@@ -1,0 +1,264 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
+
+- -----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
+
+author: BFAE 6EFF 0531 6B0C 66B4  5D9C 3FE0 FA5D A593 079F<br />
+context: to be published by 223C 61F4 CABA 73CC CB1E  3A91 1ED3 7205 00B4 D5EC<br />
+written early 2013<br />
+
+<h1>WoT is the point of the OpenPGP Web of Trust?</h1>
+
+<p>The OpenPGP Web of Trust in its current state is pointless pseudoscience. It exists to enable authentication of an identity, but it's trivial to forge such an identity. Keysigning parties are pointless. OpenPGP's Web of Trust provides what at best amounts to a secure centralized memorable identification system, claiming that it's a secure decentralized memorable identification system, but in practice, its identifiers are only memorable. The OpenPGP WoT gives cryptography a bad reputation in the fact that it leaves the user either pondering how using it mysteriously enables authentication, or going on complacently thinking he knows how to use OpenPGP. Just like X.509, the OpenPGP WoT was conceived by aliens to confuse normal humans, distracting them from the big invasion.</p>
+
+<hr />
+
+<p>In cryptography, there is a problem of designation: You know someone, but you need to be able to designate that person's public key in order to:</p>
+<ul>
+  <li>encrypt messages so that only that person can read them</li>
+  <li>verify that a message has been cryptographically signed by that person</li>
+</ul>
+
+<p>The solution is trivial. Make yourself a mapping of memorable identifiers (here, names) to public keys. The next time you meet Bob Smith in person, ask him for his public key <code>k</code>, then add an entry for that key to your mapping: <code>"Bob Smith" &lt;-&gt; k</code>. Whenever you want to encrypt a message to Bob Smith, you look up "Bob Smith" in your mapping to find his public key, then encrypt the message to the found public key. Conversely, when you receieve a message and you want to check if it is signed by Bob Smith, you look up the public key which the message is signed by in your mapping, which, if it is Bob Smith's key, will give you the string "Bob Smith". Such a system can obviously be automated. Such a system cannot be phished, because you control your own view of the namespace; An adversary is not able to pick names, so there is no risk of conflating similar names. Such a system enables secure introduction, and secure recognizability of reoccuring identities, among other things. Further information about such systems can be found in literature regarding Pet Name systems and Zooko's Triangle.</p>
+
+<p>A remaining question is, "how do I get the correct key for someone I don't know?". There is no solution to this problem. OpenPGP agents try to solve this problem, and doing so deeply cripples OpenPGP's security, as it distracts the user from real problems (Note that you can still use OpenPGP securely as described in the previous paragraph, as do I).</p>
+
+<p>In OpenPGP, public keys are allowed to claim what their names are - such a name is called a User ID (UID). A UID is an arbitrary string (typically formatted similar to <code>Bob Smith (some comment) &lt;bob.smith@gmail.com&gt;</code>) which can be bound to a public key, implying that this public key is used by the person designated by that UID. Conflict immediately arises: two public keys can claim to be for "Bob Smith" (have "Bob Smith" as their UID). How do you know which is the real one? The "solution" is to ask the rest of the world, i.e. the Web of Trust (WoT), which public key belongs to "Bob Smith". But can the rest of the world answer who is Bob Smith to you, and at the same time answer who is Bob Smith to some other person on the other side of the world? Of course not, and this is the root of the problem. The problem is exacerbated by the fact that the verification procedure is weak.</p>
+
+<p><center><a href="60ce96619a009b4e8fde9994ff44992c9d5b5d86f8bc736f209bf7cbe234b2b0.jpg"><img src="0f7b21ebc191ea38f03ddc71a9a6879cc2da67688a1f54de41644cb6be50eb61.jpg"></a></center></p>
+
+<h2>What is the OpenPGP Web of Trust?</h2>
+
+<p>Modern OpenPGP agents use a WoT to determine whether a key binding to a UID is "valid". "valid" here means that the person identified by the UID actually uses the key to represent himself. Basically, the OpenPGP WoT allows one to verify key-UID bindings without actually personally knowing the person represented by the UID. If you know and trust Jake who in turn knows Bill, Jake can vouch to you which key belongs to Bill.<p>
+
+<p>Now, there's nothing wrong with the concept of a web of trust in it self - indeed, since WoTs are not widespread, the internet is currently near useless for claims that cannot be intuitively or mathematically proved (e.g. whether a piece of C code behaves as its author claims, world news), but this is another story.</p>
+
+<p>Let's now focus on GPG (AKA GnuPG), the most popular open source OpenPGP implementation. GPG 2 to be specific. When encrypting a message or receiving a signed message, GPG will by default warn the user that the key is not necessarily "valid":</p>
+<pre>
+$ gpg --encrypt -r Jon &gt; a
+gpg: 10001000: There is no assurance this key belongs to the named user
+
+pub  1024R/10001000 2013-01-01 Jon Smith
+ Primary key fingerprint: 1000 1000 1000 1000 1000  1000 1000 1000 1000 1000
+      Subkey fingerprint: 2000 2000 2000 2000 2000  2000 2000 2000 2000 2000
+
+It is NOT certain that the key belongs to the person named
+in the user ID.  If you *really* know what you are doing,
+you may answer the next question with yes.
+
+Use this key anyway? (y/N)
+</pre>
+
+<p>The reasoning here is that the user has a key that claims its name is "Jon Smith", but the user has not verified this binding. If you sign the key-UID binding, GPG will consider it valid:</p>
+
+<pre>
+$ gpg --sign-key Jon
+
+pub  1024R/10001000  created: 2013-01-01  expires: never       usage: SC
+                     trust: unknown       validity: unknown
+sub  1024R/20002000  created: 2013-01-01  expires: never       usage: E
+[ unknown] (1). Jon Smith
+
+
+pub  1024R/10001000  created: 2013-01-01  expires: never       usage: SC
+                     trust: unknown       validity: unknown
+ Primary key fingerprint: 1000 1000 1000 1000 1000  1000 1000 1000 1000 1000
+
+     Jon Smith
+
+Are you sure that you want to sign this key with your
+key "Alice" (000A11CE)
+
+Really sign? (y/N) y
+
+$ gpg --encrypt -r Jon > a
+HELLO JON
+</pre>
+
+<p>Let's say Alice fully trusts both Chloe and Dharma to sign key-UID bindings. Moreover, let's assume neither of them are malicious and are in fact very competent OpenPGP users. She can tell GPG she fully trusts Chloe by doing this (note she has to sign one of Chloe's key-UID bindings first using <code>gpg --sign</code>, <code>gpg --lsign</code>, etc. for GPG to consider it valid; GPG doesn't count signatures from a trusted key if it doesn't have at least one valid key-UID binding):</p>
+
+<pre>
+$ gpg --edit-key Chloe
+
+pub  1024R/C1C1C1C1  created: 2013-01-01  expires: never       usage: SC
+                     trust: unknown       validity: full
+sub  1024R/C2C2C2C2  created: 2013-01-01  expires: never       usage: E
+[  full  ] (1). Chloe
+
+gpg> trust
+pub  1024R/C1C1C1C1  created: 2013-01-01  expires: never       usage: SC
+                     trust: unknown       validity: full
+sub  1024R/C2C2C2C2  created: 2013-01-01  expires: never       usage: E
+[  full  ] (1). Chloe
+
+Please decide how far you trust this user to correctly verify other users' keys
+(by looking at passports, checking fingerprints from different sources, etc.)
+
+  1 = I don't know or won't say
+  2 = I do NOT trust
+  3 = I trust marginally
+  4 = I trust fully
+  5 = I trust ultimately
+  m = back to the main menu
+
+Your decision? 4
+
+pub  1024R/C1C1C1C1  created: 2013-01-01  expires: never       usage: SC
+                     trust: full          validity: full
+sub  1024R/C2C2C2C2  created: 2013-01-01  expires: never       usage: E
+[  full  ] (1). Chloe
+Please note that the shown key validity is not necessarily correct
+unless you restart the program.
+</pre>
+
+<p>and doing the same for Dharma. What this means is that if Chloe or Dharma sign a key-UID binding as valid, it will be considered valid by Alice's GPG instance.</p>
+
+<p>Now say Alice finds a document on the internet claiming to be from "Bob Smith". She wants to verify it is signed by "Bob Smith":</p>
+
+<pre>
+$ gpg msgfrombob.gpg
+gpg: Signature made using RSA key ID 1B0B1B0B
+gpg: Can't check signature: No public key
+</pre>
+
+<p>She doesn't have the key yet. Chloe previously signed this key and uploaded the signature to a key server. Alice retreives the key from the same key server (or another key server in the same network):</p>
+
+<pre>
+$ gpg --recv-keys 1B0B1B0B
+gpg: requesting key 1B0B1B0B from hkp server a.b
+gpg: key 1B0B1B0B: public key "Bob Smith" imported
+gpg: Total number processed: 1
+gpg:               imported: 1  (RSA: 1)
+</pre>
+
+<p>She verifies the document against the received key:</p>
+
+<pre>
+$ gpg msgfrombob.gpg
+gpg: Signature made using RSA key ID 1B0B1B0B
+gpg: Good signature from "Bob Smith"
+</pre>
+
+<p>Since Alice has told GPG that she fully trusts Chloe, and Chloe has a signature on the key-UID binding, GPG considers the key valid. Another more robust way of trusting other users to sign key-UID bindings is to mark them as marginally trusted. By default, GPG requires either 1 signature on a key-UID binding from a fully trusted user or 3 from marginally trusted users before a binding is considered valid.</p>
+
+<h2>Exploiting the Web of Trust: Ambiguity</h2>
+
+<p>The problem is that the name "Bob Smith" isn't unique. There are lots of "Bob Smith"s in world. Let's say there's an adversary also named "Bob Smith", with a key with short ID <code>2B0B2B0B</code>. Dharma knows him, so she signed his key-UID binding, thus Alice's GPG considers his key valid for "Bob Smith". Let's go back and say Alice is fetching the document signed by "Bob Smith". The adversary intercepts the document, modifies it however he wants, then replaces its signature with one of his own. In this case Alice sees that the document is signed by a key with short ID <code>2B0B2B0B</code>, so she receives that key instead of the key with short ID <code>1B0B1B0B</code>:</p>
+
+<pre>
+$ gpg --recv-keys 2B0B2B0B
+gpg: requesting key 2B0B2B0B from hkp server a.b
+gpg: key 2B0B2B0B: public key "Bob Smith" imported
+gpg: Total number processed: 1
+gpg:               imported: 1  (RSA: 1)
+</pre>
+
+<p>And of course it's considered valid:</p>
+
+<pre>
+$ gpg msgfrombob.gpg
+gpg: Signature made using RSA key ID 2B0B2B0B
+gpg: Good signature from "Bob Smith"
+</pre>
+
+<p>And now Alice has the key of the malicious "Bob Smith" instead of the one who actually wrote the document. The adversary can now forge any text to Alice, and decrypt any message from Alice which was intended to go to the correct "Bob Smith".</p>
+
+<p>Opportunity to mount this sort of attack may be considered rare by some, but of course one could simply change his legal name to the name of who he wants to impersonate.</p>
+
+<p>One might argue that a UID should contain an email address as well as a name, and that it would prevent this problem, but many email services recycle unused email addresses. For example some will delete accounts that haven't been used for a certain period of time, and allow anyone to register the deleted email address. Even if the email service never recycled emails, its domain could expire and be reclaimed. This means that in order for an OpenPGP identity to be used securely for a long period of time, the user has to maintain his email address and the email service must hold onto the DNS record for the entire time, or else someone with the same name can steal his identity. This is a hassle for someone who is using OpenPGP over other mediums and doesn't even care about email or DNS in the first place. This is already too many edge cases for me to take the OpenPGP WoT seriously.</p>
+
+<p>The real problem here is OpenPGP's assumption that UIDs are globally unique (which is obviously false, but they tried to make it true again by arguing that the UID should include an email address). Names are just another attribute to describe a human, no different than eye color or height. Within some circle of people, they may refer to someone as "the tall guy", "the blond girl", or "Jesse". All of this is <b>local</b> knowledge. Try refering to "the tall guy" to some person you don't know on the internet. Globally, a name is not enough to uniquely identify someone. It follows that a UID belongs to an unlimited number of people, including adversaries.
+
+<h2>Exploiting the Web of Trust: "Key Signing"</h2>
+
+<p>There's another more sinister issue lurking. The reason Chloe decided that the binding of this key to "Bob Smith" is "valid" is because she met someone in person, who showed her some government identification with a photo that matched his face, which "validates" that his real name is "Bob Smith". He then told her his public key fingerprint so she knows which key he's talking about. This is how verification is typically done in the OpenPGP WoT, and there really isn't much more that can be done. The only indentifying information in this UID is "Bob Smith", and the only common way of matching a name to a person is by government identification and word of mouth.</p>
+
+<p>Clearly, this is exploitable. Let's say Alice finds a document on the internet describing a method to synthesize some vitamin she needs. It's written by "James Hendrix", who is a pretty well known and trusted person in an online biochemistry community. Alice wants to verify she has the correct "James Hendrix" before following the method. She proceeds to fetch his key using the short ID embedded in the document. Previously, Dharma met an adversary Mallory in person who had a fake government photo ID with the name James Hendrix. This was enough to convince Dharma to sign the binding of Mallory's key to the UID "James Hendrix". When Alice retrieved the document, Mallory intercepted it and modified it to result in poison instead of the vitamin. The signature was replaced with one from his own key which Alice trusts because it was signed by Dharma. Alice dies.</p>
+
+<p>Again, one might argue that a UID should additionally contain an email address which should be verified. In such case the UID for "James Hendrix" would have been something like <code>James Hendrix &lt;james.hendrix@email.com&gt;</code>. Mallory would then have had to in addition to showing photo ID to Dharma, send an email to her signed by his key from <code>james.hendrix@email.com</code> to prove that he's actually the owner of that email address. But this proof is relying on the authenticity of the email address, which is trivial to forge (Indeed, OpenPGP is most commonly used for signing email because it's taken as a given that email is insecure). Mallory would have simply forged an email from <code>james.hendrix@email.com</code>, and Alice would still end up dead. The proof could have been the other way: Dharma signs Mallory's key, and emails that signature encrypted with Mallory's key to <code>james.hendrix@email.com</code>, but this would still be insecure since email is insecure (message can be intercepted in transit by attacks on DNS, TCP, etc).</p>
+
+<p>It comes down to this: Zooko's triangle conjectures that any identification system can only have any two of the properties secure, decentralized, and memorable. The OpenPGP WoT is an identification system which can be categorized as only memorable - i.e. it doesn't even have two of the properties. Optimistically, one may argue that it is also secure and centralized but since a forged government ID is enough to be verified, this isn't true. For it to be centralized, the government itself would have to verify the ID. Email is not centralized and secure either. The point is that most (practically all) users wont even check validity of government ID or email properly before signing a key-UID binding, and rightly so, because it's very hard (impossible in most cases) to do this. They will instead check that the ID's picture and name match the signee's face and who he claims to be, and that they receive an email that appears to be from the signee.</p>
+
+<p><center><img src="0ee76b03d41405d6bc59b09f0d1a06d3c1f5b073100fbbf2842416f9fb3ad173.png" /></center></p>
+
+<p>Even if the OpenPGP WoT would become serious, meaning everyone would do proper checks by government and email services (assuming these checks magically became possible within all governments and all pairs of email services), thus making OpenPGP's WoT a memorable centralized secure identification system, what would be the point? The whole reason PGP came to exist was to have end-to-end email security, which means security must not rely on any central authority. This is ironic and embarrassing.</p>
+
+<h2>Practical Exploitation</h2>
+
+<p>This is pretty easy to exploit. Simply get your key-UID binding signed by exploiting ambiguity or the weak verification process. If your victim is using the WoT, it's likely that he would have published his signatures for the keys of people he trusts - this gives you a list of people who you can trick into signing your key-UID binding. If your victim wants Joe's key, and trusts Alex, who doesn't know what Joe looks like, simply get your key-UID binding signed by Alex by changing your name to Joe or making a fake ID for Joe, meeting Alex, and forging/intercepting email if Alex requires email verification. Next post your key to all the OpenPGP key servers, so when your victim searches for the key, he sees the one you uploaded. One complication is that if the key server already has an entry for Joe, depending on the OpenPGP agent the victim is using, it may just fetch the one that was there before you, or present the user with a choice of multiple Joes. To get around this you can intercept the victim's connection to the OpenPGP key server and return a response containing only your key. The main difficulty to the attack is that you have to do it <i>before</i> your victim tries to get Joe's key.</p>
+
+<p>Having only a limited time to mount the attack does permit to do reasonable damage, but there's an alternative attack. Some OpenPGP agents (at least current versions of GPG 2) have a useful bug. GPG 2 has a command <code>gpg --refresh-keys</code>, which will make it get all the new signatures for known keys, among other things. The bug is that for all keys in the user's public keyring (this is the list of public keys that the user can receive/send to by name, short ID, fingerpring, etc), GPG will download all keys with the same short ID into his public keyring. Generating a key with the same short ID as someone else's is trivial.</p>
+
+<p>This GPG 2 bug improves the attack if you only care about forging messages from Joe to the victim. Generate a key with the same short ID as Joe. Get its UID binding signed by Alex. Upload it to the key servers. Now all you have to do is wait for the victim to run <code>gpg --refresh-keys</code>, and you'll be able to forge messages as Joe.</p>
+
+<h2>Bonus</h2>
+
+<p>One thing that wasn't mentioned so far is that a key can have multiple key-UID bindings. It's not exactly clear what the purpose of this is, other than perhaps to compensate for the fact that people have multiple names in real life. In any case, it just adds to the confusion. It's so confusing, that the GPG developers even messed up implementing it. There's yet another bug in GPG 2: If a key-UID binding is considered valid by GPG, later another UID can be bound to that key, and it will also appear to look valid. This enables another method of forging messages.</p>
+
+<p>If you have a valid key for "Richie", it will look like this when you verify his messages:</p>
+
+<pre>
+gpg: Signature made using RSA key ID EEEEEEEE
+gpg: Good signature from "Richie"
+</pre>
+
+<p>Say he adds a new UID "Richard Stallman" to his key and re-uploads his key to a key server. You then run gpg --refresh-keys. This makes GPG download the updates to his key. The next time you verify a message from him, it will look like this:</p>
+
+<pre>
+gpg: Signature made using RSA key ID EEEEEEEE
+gpg: Good signature from "Richie"
+gpg:                 aka "Richard Stallman"
+</pre>
+
+<p>The output doesn't make it obvious that only "Richie" is valid for this key and not "Richard Stallman". This is straightforward to exploit. If you run <code>gpg --edit-key Richie</code>, you'll see the truth:<p>
+
+<pre>
+pub  1024R/EEEEEEEE  created: 2013-01-01  expires: never       usage: SC
+                     trust: unknown       validity: full
+sub  1024R/FFFFFFFF  created: 2013-01-01  expires: never       usage: E
+[ unknown] (1). Richard Stallman
+[  full  ] (2)  Richie
+</pre>
+
+<hr />
+
+<p>I've only shown how you can manually mark people as trusted, making GPG take their signatures into account. There's in fact a feature in GPG called "ownertrust". It allows you to trust trust, i.e. if you "ownertrust" someone, he can choose who you trust signatures from. There are in fact infinite levels of "ownertrust", i.e. you can trust trust in trust, you can trust trust in trusting trust and so on. This idea makes some sense for WoTs in general. However, practically nobody actually uses this in OpenPGP, nor is it documented beyond a few words and handwaving, which brings us back to the original question: What is the point in the OpenPGP WoT?</p>
+
+<p>There's no point. From what I've seen, if you engage in a conversation about cryptographic identification with someone, one of you will eventually start talking about how to know which keys are "correct". You'd both agree that X.509 is worthless, and he'll then say the solution is a WoT, and give a brief handwavy explanation of why it's good. Both parties unsatisfied, the discussion will end there and move onto other issues. The actual details of such a system are rarely discussed. The OpenPGP WoT is an actual manifestation of this. There's no evidence that any thought went into what an identity is in the OpenPGP WoT. Try finding any discussion of what a UID means on the internet. There are none. Whoever came up with the OpenPGP WoT were probably just like "Oh yeah, you just need to sign keys to prove they are valid. This solves everything". The fact is, you'll probably never have an opportunity to exploit the vulnerabilities in the OpenPGP WoT because nobody fucking uses it. Most people just do stupid shit like fetching a key from a keyserver and concluding it's legit.</p>
+
+<p><b>The takeaway from this article should be that the OpenPGP WoT is useless.</b> Too often I observe people trying to figure out how to do cryptographic identification, and they just instantly turn to the OpenPGP WoT since it already exists and is highly acclaimed. The OpenPGP WoT is hazardous in that it acts as a substitute for sound cryptographic identification techniques. Some serious work needs to be done before the OpenPGP WoT can be considered useful. In particular, it should be made explicit what a UID means and what the limitations and risks are. The current state is that if you ask anyone, the answer will be "I don't fucking know", and this is unnacceptable for a communication system that is part of the backbone of the internet.</p>
+- -----BEGIN PGP SIGNATURE-----
+Version: GnuPG v2
+
+iQIcBAEBAgAGBQJVANbdAAoJED/g+l2lkwefs9QQAJsi+X+J3ABT8xIFzmMBG5Ol
+0wLGU5VW4vVzL98tn1Wnzq8dHyQChDtYcdE+ZSQX509NHYmVFHHasLSV4btSel1G
+S9VuZJSL7mT16S6NnUhfMd0Rh0FaBowAcF6JL0AFg6GZavJ+kwujVJ8AJDN/5r1Z
+g1t/p7vg91N+ZcceHYr2ZKbJKJGVzicJ5ZteVqkHi7+8mdnDEN3PQlLBOVqtW2R3
+iB5oXNxrbvcMFRuMIYigEP53lCIH8iKe7tSq0axC22uPNI2RPcoP8uqSuzyj0DRE
+dOwXtdtmW6hdY2FnCW2wFnXJJP3FUwniECgupJWe+Yplg0z1x/lcbqaPcwlMb/ca
+RlFWU5FM9w1zlJvHJ2n0rrHHI21UhOjsSHEPWiFnV265JGNi/FQbsoSRNJv8NSuX
+TLgiveIDMpPKqZtBwTFOltG0atspZe/xdA1tlyfVCNfBam2B2RWl2TSNHl6Uxivr
+Rm/9ytsOXTlv80VVPT0yeFBtIwUmgNBA9qydCCRV+2vn+MNgkqanGxhyrPjjQjpK
+BVXtBBTn5Z8RcTEqmVdMFcDD3zdMKijyHTG6i/39XYb4jjYZrs01+6iE9smrZyOG
+0OfuqvMylc2e3FLXIHY1ERbG6m6UkXjlblb2PTuMUmLstbIvtKG1nxN4DmPQ9mDj
+3HuzodPVNPk3T9vs14xX
+=cPHY
+- -----END PGP SIGNATURE-----
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v2
+
+iQIcBAEBAgAGBQJVANeVAAoJEB7TcgUAtNXs5yEQAI0Ltp45ztMTK4vJRIU2echW
+alnrbmVJs5jobVcjzhDj/g3wTw1BPF/E/5eFTn1pDH0bdS1BAO5m7uA3Cu9V7h2D
+Gxv1A3Lu2esSvsAB7EtrHE1NZgRC/RYi7nyBBETj3CvcVvP9MPFZ8rn2+r70ztTN
+v6c1r2YIciWV6ZVGimPt7odTELdQl496P77Z1eUlkmx97Tf+w3+K5/oWriCLcYel
+gjj1k/Lq7ZA8dSsxD6FGR12KBHbUCyYn8tMK/4hu6hu7ZRB61xIZcWOzrddPcxHe
+GuNkJnjaTAXZYxyxuPGLiIV2DhUEsDnqXYbh31Va802msleR/x+e8LbQwn4iPrgO
+2rPa/JQO5TawBnnPTPy7fkJR8ssRglCHtpgLmTy8pCsq3P22O8ZC8tpkCwmYcKce
+NftaU3uPsi7l33R+RRIjElhuAt8T/IBzusaPd+atARPDWftz6q4dAxaUM6AOKusi
+BZj5L5FfqUq2RHdtMbRx5fOAkn04K2110S892mLiYuc1z6Fv9Pk1L8fGoxUgWEat
+Eovy2Nak0oEHFi1ZcpFnZktEPxbkI5eL23ZUiy7IJn/IiZNr0d9k50W9IImX4na7
+SbXqsp7djN+h03Ih40scWk6GCpsVdtidHgic0hkC2NgITpYLfh77GOrHiEadc6od
+hwwX5Mm9oeN6YZZZWR20
+=mhE3
+-----END PGP SIGNATURE-----

@@ -1,0 +1,314 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
+
+author: BFAE 6EFF 0531 6B0C 66B4  5D9C 3FE0 FA5D A593 079F<br />
+context: article<br />
+written late May 2015<br />
+
+<h1>Ballistic rekt edition</h1>
+
+<p>I've been thinking about cool hacks I've seen like the F.E.A.R hack some dude made that has a feature to make all players in the game freeze except you (I never figured out how that worked), or cartillery in BF2, or the interesting stuff in my Crysis hacks such as teleporting a spawn vehicle into the sky so all your team gets stuck in the sky or can jump to their death - or the "anomaly hack" in Crysis which created little spheres of force in a chosen direction, enabling funny stuff like trapping a team in their spawn building, or creating invisible barriers that cars crash into and people die/get pushed when they walk into. I wanted to outdo all that. Well, I'm not sure if this is setting a new record, but it's still interesting enough.</p>
+
+<p>Somehow I ended up hacking this retarded free to play game called Ballistic. Ballistic is yet another crapgame like F.E.A.R, Crysis, S.T.A.L.K.E.R, Combat Arms, Planetside 2, Multi Theft Auto (Which apparently GTA5 has drawn inspiration from), etc, where you can do ridiculous things that no sane network code would permit, such as flying or killing everyone in the game within 10 milliseconds regardless of where they are in the game world. It's using the Unity game engine, which means the entire game is written in C#. This makes reverse engineering much easier since C# has good (enough) decompilers and all names aside from local variables (whose use are dubious anyway) are preserved. This experience confirmed my long standing "theory" that syntax formatting in programming languages is useless despite that every modern developer spends hours doing it to adhere to Best Practices. Whatever .NET Reflector does to indent source works good enough; no developer intervention required. I've read thousands of lines of C# in this game, and found it no more difficult than reading any other typical C# or Java codebase.
+
+<h2>Main hack features / hints</h2>
+<ul>
+  <li>God mode (for yourself or any player)</li>
+  <li>Ghost mode (for yourself or any player)</li>
+  <li>Ghost vision - you can see ghosts but nobody else can</li>
+  <li>Force kamikaze/last stand animations (for yourself or any player, even for characters that don't support it)</li>
+  <li>No recoil/spread</li>
+  <li>No fall damage</li>
+  <li>Infinite ammo</li>
+  <li>No self-nade</li>
+  <li>Unlimited energy</li>
+  <li>Resupply Button to instantly get health/ammo back even when you're nowhere near a resupply station</li>
+  <li>Rapid fire / grenade throwing</li>
+  <li>Grenade spam blame</li>
+  <li>Choose grenade throw power (speed / how far it goes)</li>
+  <li>OPK (only enemies, works even when you're not spawned)</li>
+  <li>Anonymous OPK (same as above), Black screen</li>
+  <li>Drop nade cluster (dud or not)</li>
+  <li>Launch dud grenades at saved position or launched from a targeted player</li>
+  <li>Change name</li>
+  <li>Server chat messages, color chat messages</li>
+  <li>View player ping and state packet (PlayerState) rate</li>
+  <li>Lock up player (DoS)</li>
+  <li>Take all the bases (also works when you're not even spawned)</li>
+  <li>See other team's private chat (always on)</li>
+  <li>Use any player's character / items</li>
+  <li>Disable end of round music (always on)</li>
+  <li>Player name copying (requires rejoining the game)</li>
+  <li>Bypass profanity filter</li>
+  <li>Chat as any player in the match</li>
+  <li>Join any match's chat even if you're not playing in it</li>
+</ul>
+
+<h2>Interesting game components</h2>
+<p>AFAIK, the full game protocol aside from chat is done over ElectroServer, which is apparently some old server software and corresponding client library (ElectroServer5-Unity.dll) typically used for Flash games (but has a .NET client I guess), and supports UDP and TCP channels. The protocol serializes values of maps,ints,arrays, etc, much like like JSON. I haven't looked into how ElectroServer works at all. It's probably full of more fun bugs. I just know the game code submits these JSON-like values to it to be sent to the game server, and the server sends the same types of values back. The TCP channel is used for sending and/or receiving stuff like UserHitEvent (a packet saying you hit someone, how much damage you did, where you and him were, where you were aiming, etc), ClassChangedEvent, SpawnEvent, DieEvent. The only use I know of the UDP channel is for sending/receiving UserStateUpdateEvent, which contains your position/look direction, damage modifier, whether you're in kamikaze/last stand mode/etc, whether you're shooting, and some other crap. Clients send UserStateUpdateEvents about 15 times per second and the server just relays them to everyone.</p>
+
+<p>The game server is dumb and does pretty much nothing other than managing inventory, rank, stats, etc. It knows nothing about physics AFAICT. This is why you can OPK, take enemy bases even when you're not anywhere near them, and resupply when you're not anywhere near a resupply station. The game is more interested in managing useless BS like rank, items, stats, level, social, etc, than being an FPS game.</p>
+
+<p>Every player has a "gukey" and "RUM gukey", which are supposedly unguessable hex strings. The packets in game either use the clientid, which is an 8-bit number, or rum gukey/gukey. My hack logs everyone's gukey/rum gukey as well as displays the rum gukey in the player list which you can copy to the clipboard. The game itself has a "game gukey". I presume the other games made by the same people have a different game gukey.</p>
+
+<p>Chat is handled fully over XMPP (or not, there seems to be some chat code in the ElectroServer crap too, dunno whether it's used), which means the chat is subject to all kinds of hidden features and rules that exist in XMPP and nobody (especially not the game devs) knows about, but nevermind we don't even need to care about this since you can just log into anyone's account (since they effectively have no password) and join any game chat room. Your username and password in chat is just your rum gukey. Thus, you can easily log into chat as anyone. Every game room has a corresponding XMPP chat room, and I'm 99% sure parties also have their own chat rooms in XMPP, which are identified by yet another hex string. You can even join any chat room as any user and it will let you in. You can use XMPP service discovery to list every chat room that exists, join them all, and spam them. You can do this all over a TCP proxy and don't even need to associate it with your game account/IP/HWID/etc. Your XMPP resource when the game logs you into chat is set to something like &lt;game gukey&gt;:kg or &lt;gamegukey&gt;:fb depending if you login from kongregate, facebook, yahoo, or whatever. Prefixing an XMPP chatroom message with 1 makes it a server message. Prefixing it with 2 makes it a message to everyone in the room. Prefixing it with 3 makes it a team only message. Note in any case, it sends the message to everyone in the room, which is how XMPP works.</p>
+
+<center>
+<img src="64a043e4c4c23f3e55ca0a98571cbea19cc34b4a2fd7b2f6548f2365b7bf7d92.png"/>
+<br />Party rooms<br /><br />
+<img src="085328646975ffbd39cdf8d28311e8365dce5a14900a50a74676605b375d0f2a.png"/>
+<br />Game rooms<br /><br />
+<img src="b3fd51b4eb52c7069861d72367522738249768ea50261d3cdcacea7372f133d8.png"/>
+<br />Invites or something<br /><br />
+<img src="d4814b892cdbc2346986eacaee09c890d810a4675b8e5c0c63ab885f64c87b77.png"/>
+<br />Statuses<br /><br />
+</center>
+
+<p>Your XMPP status message has your some JSON containing nickname, rank, level, and bracket, or something like that. I'm not sure what it's used for. Your in game friends are added as contacts in XMPP. There is some more JSON sent between XMPP clients, perhaps for inviting to parties, private messages, etc.</p>
+
+<p>The game has multiple servers which I think each have their own sets of rooms. There's at least one in Brazil, Signapore, and some in North America. When logging in through facebook it seemed to put me into a different server than when I logged in through kongregate... maybe they share the same rooms maybe not.</p>
+
+<h2>Anticheat mechanisms</h2>
+<p>There is some stuff to detect DLL injection (the InjectionDetector class) that they copied and pasted off the web. It compares each loaded assembly's hash against a known hash or something like that. It's trivial to disable and my hack disables it. I don't think it does anything when you only modify the main assembly (Assembly-CSharp.dll) anyway.</p>
+
+<p>The next thing to worry about (or not) is the OPK detection (the HitEventValidatingComponent class). Basically, if you OPK you're automatically reported by every unmodified client that witnesses it (not with my hack though, I bypassed the OPK check by sending all my spoofed hit packets as grenade hits, but do note, if you shoot/knife people while you're a ghost, you'll be reported). There are tons of false positives due to lag, but there is a measurement of how sure they are that it's an OPK. <b>When you turn people into ghosts, they get reported by the OPK detection</b>, as you can see in the debug logs. Even if it wasn't possible to make people OPK each other, you could just have a bunch of people (or bots) join a room and collude to give the same false reports against someone they want to get banned. I have no idea whether the OPK detection is actually used to ban people or not.</p>
+
+<p>Here's a technical explanation of the OPK detection mechanism. Every time you shoot someone, you send a UserHitEvent over the ElectroServer TCP channel to the server which includes the position/direction you shot from, and the position of the player at the time you shot him. A HitEventValidatingComponent instance on a witness client checks the distance from where you claimed you were when you made the hit and where it thinks you are, and where you claimed the victim was and where it thinks he is. If the max of those distances is above some threshold, it makes a hack report to the server with that distance. The next important part is that the witness client checks if a ray from where it thinks you are to where it thinks the victim is along the direction you claimed you shot in hits the victim player and doesn't collide with an obstructing object. If this ray check fails, it just adds 3 to that distance value it sends to the server, which is already dubious. All of this means that if you OPK someone without a line of sight, to the target, you are reported with the at least the value 3. If you spoof your location in the UserHitEvent to be right next to the victim so you can convince a witness you have a line of sight to him, the witness will notice that your distance is off from where he thinks you are and where you claimed you are, and report that potentially huge value. Teleporting to the victim will bypass this assuming your teleport packet arrives before your shoot packet, but at the time of analysis, I assumed that would trigger speedhack detection, but I'm not sure if there even is  non dead speedhack detection code. Another dubious thing I just noticed is that it checks the line of sight with respect to where <i>it thinks </i> you and the victim are, instead of where you claimed. This would admit false positives all the time because the victim may have moved by the time your hit packet arrives, and your hit packet may arrive after you moved/turned. Maybe I'm missing something. My initial idea for bypassing the OPK detection was to try using NaN or some other floating point tricks in the angles or positions to make the checks always pass, but it turns out you can just set your hit to grenade type and it will bypass the OPK check completely, so I haven't analyzed the OPK detection crap further. Note that a witness will not do the detection when he is the victim or shooter, so don't rely on the debug logs for testing your own stuff. You could easily make it check your own hits and log but not report though.</p>
+
+<p>There are classes like ObscuredInt/ObscuredFloat/etc which are wrappers around int/float/etc which encode values and IIRC also do some integrity checking of the values to deter the use of tools like Cheat Engine, but they are pointless since you can just decompile the game and get something just as good as the real source - no Cheat Engine required. I don't think any of these are used. There's also a class called Crypto which does something similar and is also pointless. I found where to enable infinite ammo in 5 minutes by simply looking at what calls Crypto.XORInt.</p>
+
+<p>You can conveniently find most of the anticheat stuff by simply searching the assembly for namespaces with "anticheat" in the name. There's a class called SpeedHackDetector and more speedhack detection and some packet rate too high/too low stuff in PlayerStateValidator. I can't remember to what extent they're used, if any. If speedhack detection is done, it would probably give false positives when people fall long distances, when they lag/drop packets between movement, and especially when you teleport them with the ghost hack.</p>
+
+<p>In my experience it seems like you just get banned if someone reports your name. You can probably get any player banned with any bullshit, such as a screenshot/video. With my latest account, I've been abusing as much as possible while avoiding getting kicked, and have not been banned for months. One time, there was a hacker in a room showing off, and I merely started spamming rapidfire grenades for a few seconds, and someone said something about "reporting", and I got banned a few hours or a day after. Yet I spam infinite nades, OPKing, using god mode, etc all the time while changing names (and having unicode homoglyphs in them) between games and never get banned. I also got banned once right after being kicked from 2 or 3 games in a day. I've seen people complaining on the game forum that their account got automatically temporarily suspended after getting kicked from 3 games, so maybe that's what happened. I didn't bother trying to go back on the account to check, and the hack disables the ban/suspend screen so you can't tell when you're banned untiil you join a game and it fails. I wouldn't be surprised if they just permaban someone if they're votekicked 3 or more times.</p>
+
+<p>IIRC, the game sends your hardware profile (only the information that Unity allows, which is still a lot including CPU/GPU info) to the server, so maybe they do HWID banning. I think this info was sent over the telemetry API (which I disabled I think. inb4 they're retarded enough to ban people for not submitting telemetry data), but it might be sent over other channels as well. The game probably sends browser info as well.</p>
+
+<h2>Installation</h2>
+<p>Download and extract <a href="f186fe81fec43cca7044893e0129b3bf4325a5db385a71bfb6c35b9d9abdad73.tar">this</a> somewhere. You'll need Python 2.7 or similar version installed to run server.py. server.py is an HTTP server that serves files to the Unity game loader (ballistic.html). ballistic.html will load game.unity3d from server.py, and then when that loads, it will try to load more files (game maps, weapon models, etc) from server.py - these requests will be forwarded to the real Ballistic server and cached. ballistic.html talks to server.py over port 1337. If you are already using that port for something else, change the port in those files. ballistic.html is a stripped down version of the loader web page the game uses when joining from Kongregate, modified to load the game from server.py instead of the official servers.</p>
+
+<p>You'll need three pieces of information to log in: <code>rumgukey</code>, <code>requestid</code>, and <code>accesstoken</code>. These can be obtained by capturing web traffic when you join the game through Kongregate or Facebook or whatever. For example with Firefox and the HTTPFox plugin, go to the login screen of the game, and press ctrl+shift+f2, press "Start" to start capturing traffic, then log in. Once the game is loaded to the main menu, you can press "Stop" to stop capturing traffic. Search for a request with <code>canvas?region</code> in the URL. You should get one captured HTML page (click the Content tab) that has something which looks like this:</p>
+<pre>
+      var RAPI = {
+  "playerGukey": "abcdef...",            &lt;-------------------- rumgukey
+  "playerAccessToken": "abcdef...",      &lt;-------------------- acesstoken
+  "playerSampleBucket": 0,
+  "channel": "kg",
+  "gameGukey": "804fb2b1d41b44198c42c64ec100213b",
+  "legacyGameGukey": "804fb2b1d41b44198c42c64ec100213b",
+  "gameServerGroup": "game_server_2_0",
+  "gameServerHost": "184.173.142.138",
+  "gameServerPort": 9899,
+  "country": "CA",
+  "availableLocales": {
+    "pt_BR": "Portugues",
+    "en_US": "English",
+    "de_DE": "Deutsch",
+    "fr_FR": "Francais",
+    "es_MX": "Espanol"
+  },
+  "availableRegions": {
+    "eu": "eu",
+    "default": "default",
+    "ap": "ap",
+    "sa": "sa",
+    "us": "us"
+  },
+  "currentRegion": "us",
+  "requestId": "abcdef...",     &lt;---------------------------- requestid
+</pre>
+
+<p>Now go in ballistic.html and replace the strings <code>&lt;rumgukey&gt;</code>, <code>&lt;accesstoken&gt;</code>, and <code>&lt;requestid&gt;</code> with these values. You can make another copy of ballistic.html for each account you want to use. Note ballistic.html has a line like <code>"gameServerHost": "54.242.12.247"</code>. You can change the server to any other, for example the one above (184.173.142.138). You can find all the servers through XMPP, like in the Service Discovery screenshot above. To start the game, just run server.py and then open ballistic.html in a web browser (I've only tested with Firefox).</p>
+
+<h2>Controls</h2>
+
+alt+u toggle display of user list<br />
+alt+o toggle display of main options<br />
+alt+i toggle chat as server<br />
+
+alt+l set saved position<br />
+alt+x launch nade from saved position<br />
+alt+c launch nade from targeted player<br />
+alt+v drop dud nade cluster around you<br />
+alt+b drop real nade cluster around you<br />
+alt+n anonymously kill selected player<br />
+alt+z resupply
+
+<h2>Buttons in player list window</h2>
+
+G  ghost mode - body teleports somewhere in the player's spawn<br />
+G' ghost mode - body teleports to your saved position set by alt+l<br />
+D lock damage reduction (god mode)<br />
+K force kamikaze<br />
+L force last stand<br />
+H do damage<br />
+
+<h2>Features</h2>
+
+<video src="ea170bb6a8a6c3e4b084c59af939b9486ae5b71e7718ae0851a3ee2e04085719.mp4" controls></video><br /><br />
+
+<img src="74e83c273266d7d1730fd68780fbb22a06c4ee443d0175ebbdb4ae1b5f0435bb.png"/>
+<br />Main hack menu<br /><br />
+<img src="7f74b4f4ace7ed92c8234b40ae5df16824c4746761efc22ccb28ed019a30f56a.png"/>
+<br />Player list window
+<br />
+
+<h3>God mode</h3>
+<p>press the D button on any player list entry including your own. See notes about ghost mode for caveats. God mode players can still be killed with knife/sword. Players with god mode appear to jitter, but not you. If you enable God mode you should also enable "no HUD feedback" and "no camera shake" or else your game will lag if someone shoots you with rapidfire. Also with most OPK hacks I've seen people use, they have infinite ammo/rapidfire and just make their game think all the players are in front of them and shoot. This freezes your game if you have godmode but you didn't check these options.</p>
+
+<h3>Ghost Mode</h3>
+<p>To make yourself into a ghost, check dontSendOwnState. Your body will remain wherever it was. If you check it before spawning, I'm not sure what happens - your body seems to be invisible or out of the map, but sometimes it prevents you from seeing other players until you disable it (you can re enable it after). Turn any other player into a ghost by pressing G or G' in his player list entry. G teleports the player's body somewhere in his spawn and G' teleports his body to the saved position. All players can see and shoot the ghost bodies. If you want to hide a ghost body in free for all mode, it's best to click on of the "default" location designation buttons which have some coordinate outside the map, and then press G'. Ghost vision is always there. No other normal player can see ghosts except you.</p>
+
+<p>The way ghost mode works is by sending some packets with a timestamp in the future (how far in the future, in milliseconds is specified by the replay timestamp offset). You send about 20 of these, and it fills up the buffer for the player you are ghosting in every witness's client. A witness will ignore any real packets received from the ghosted player as long as they are timestamped before your ghost packet timestamps. This means that once you leave the game or disable ghost mode for that player, the players are still ghosts until the the timestamp you set the ghost packets to. So on a setting of 30000ms, if you turn someone into a ghost and leave the game or turn off ghost mode for that player, he will no longer be a ghost 30 seconds later. You can set this value to 10 minutes or an hour. If people suspect you're the one turning people to ghosts, they will kick you. But the ghosts will still be ghosts and thus they can't be sure they kicked the right person. If you want people to turn back from ghosts into normal people on demand, you're better off with a small timestamp offset, like 30000ms. Unfortunately, my god/ghost mode/kamikaze/last stand code resends incoming packets, but to prevent replaying the fake packets, it has to somehow check if the packet is from the real player or a fake packet I created. The way I do this is by checking if the packet is at least 15000ms in the future. It's super ghetto. This means stuff will break if you set the replay timestamp offset to under 15000ms. There are ways to remedy this but I haven't got around to implementing them. All this means is that if you turn someone into a ghost, you have to wait at least 15 seconds until he can become normal again. The next thing to note about the ghost mode implementation is that when a new player joins, he only sees the real packets from the ghost player, not the ones you sent before he joined with future timestamps. Thus you have to redo the ghosting process of sending 20 packets with future timestamps. This is done automatically. The reason I mention this is because every time you replay packets, you risk getting disconnected because your packet rate goes too high. The risk with ghost mode seems small though. I haven't bothered to figure out what the actual rate limit is to optmize ghost mode/god mode/kamikaze/last stand, but if you want to experiment, the easist thing to do would be to change StateSync.replayRateLimit (default 13/second). Of course the lower you set this rate, the more jittery the god mode/kamikaze/last stand players become. I don't know why interpolation is not done for these players, it probably has something to do with the packet timestamp being in the future. If you're putting someone in god mode/kamikaze/last stand, you can simply turn yourself into a ghost, and this seems to prevent you from hitting the rate limit since it stops you from sending your own packets.</p>
+
+<p>I always ghost the top players when I'm hacking so players don't notice I'm hacking, and waste their kickvotes on the ghosts. If the good players are on the enemy team, I select one (by selecting his name in the player list) and press alt+n (with hit damage set to NaN, see Anonymous OPK) whenever he comes near me, so he teleports out the map and dies. Unfortunately I didn't get around to making it so you can select multiple players at once, or distinguish enemy ghosts from friendly ones.</p>
+
+<video src="3bb24c8f43bda144da38641a6d33ddb5704b59bef8b0fc5ea9abeddd7a37cae6.mp4" controls></video><br />
+Various players turned into ghosts
+
+<h4>Ghost mode minigames</h4>
+
+<video src="3d4ecc64e8f4927ade4f1a560806f3b563a15d5b7d881ee7fdfa75afe0798dcb.mp4" controls></video><br />
+ISIS execution<br /><br />
+
+<video src="dde824b9e5909b6f55fee400069beae74922d5c770851e073ad338873f312d85.mp4" controls></video><br />
+race to bodies - I run around to see all the ghost graves at the end of the video. ghost graves are left over when a ghost dies or quits the game<br /><br />
+
+<video src="56d39624203d3f518a09d82d9d81253fce63d62b8901f3180be2fc635c648186.mp4" controls></video><br />
+ghost team
+
+<h3>Force player state</h3>
+<p>To make yourself do the kamikaze or last stand animation, check isKamikazing or isLastStanding in the main hack menu. To make other players do it, press K or L on their player list entry. God mode doesn't work when in last stand mode. Putting a player into kamikaze or last stand mode makes them appear to jitter. It uses the same packet replaying mechanism as god mode. See notes about ghost mode above.</p>
+
+<video src="151d4967ab54691afe7d1f11b77f0fd8907c40d9f42a39a439233e90325034aa.mp4" controls></video>
+
+<h3>Resupply button</h3>
+<p>Pressing alt+z will restore your health and ammo. It works by sending the same type of packet you send after holding E at a resupply station. You can do it from anywhere in the map. It cycles through each resupply station in the map including the enemy's stations (there are some hidden stations on most maps that are usable too). I haven't found a way to bypass the resupply cooldown timers, and if you spam the resupply button, it will use up the resupply stations regardless of whether you had full health/ammo.<p>
+
+<video src="e2dec17ac6b65c1a2763ad1f3b9a4f497a07d756b170db20a39a470345987fe3.mp4" controls></video>
+
+<h3>Rapidfire</h3>
+<p>If you enable rapidfire grenades, it will use some alternate grenade throwing method I made to avoid doing the hand animation etc. It just launches out of your head or something... I forget. It uses the nade launch power, which you can adjust using the text box under the "nade launch power" text.</p>
+
+<h3>Grenade spam blame</h3>
+<p>alt+c launches a grenade from where the selected player is aiming. Select a player by clicking his name in the player list. These nades are duds so they do no damage (a GrenadeLaunchEvent is sent with the starting position/vector, but no UserHitEvent is sent). You could code it so the nades do damage, but I haven't found a way to make the nades do damage as another player instead of you.</p>
+
+<video src="ff214b917358204663484046a83173270393ff808b04425c59af6134fb058f00.mp4" controls></video>
+
+<h3>OPK</h3>
+<p>To OPK someone, set the hit damage and then press the H in the target's player list entry. It will continually send hit packets at a rate according to the Hit interval (default 15). When you do 0 damage they can't tell you're hitting them. But perhaps one of the character skills reveals a player on the map who hits you, which would give it away. It's also fun to do a small amount of damage. If you hit everyone for 0 damage, you get points when they die.</p>
+
+<h3>Anonymous OPK, Black screen</h3>
+<p>Same as above, but set the hit damage to NaN. This causes the player's client to bug and teleport outside the map, and subsequently die due to being out of bounds. Everyone's screen will subsequently turn black for a second due to other bugs. I assume what's happening is the player's speed is slowed or the player is pushed by being shot, and then there's a NaN factor that gets propagated through the equation. Also if you set your grenade launch power to NaN and throw one, all the enemies die outside the map at once and the screen once again turns black. I don't even... Also, when spamming NaN nades, everyone's screens will stay black.</p>
+
+<p>There is a superstition among the players in this game where they think someone dying out the map means they are hacking. If you juts anon-OPK one person, there's a high chance he will be votekicked out.</p>
+
+<video src="34464ede27c1a275568a20312294acd3095743218c8853589ef5eaab1db44839.mp4" controls></video><br />
+OPK and anonymous OPK<br /><br />
+
+<video src="779f481be72a6fbf55847452b1c1a276f7dadbf6aa88a03fea67a3d4a38c425f.mp4" controls></video><br />
+I somehow OPKd myself and my own team once with a NaN powered nade. I have no idea when or why this happens
+
+<h3>Change name</h3>
+<p>Fill in the text box under the "change name" button and press the button. You can copy and paste unicode into this. I usually generate a name with homoglyphs so that if someone reports my name, not only can the devs not find it easily (assuming they even know homoglyphs are a thing), but since I change name every game, they can only find me if they've been logging every name change and who used the name (or maybe if they recorded the list of players in the game the player reported). Of course I don't know how effective this was, but I've never been banned while using full hacks. Here's a simple example of some Python code to generate a name with homoglyphs:</p>
+
+<pre>
+d={'E': u'\u0395',
+ 'M': u'\u041c',
+ 'N': u'\u039d',
+ 'P': u'\u03a1',
+ 'a': u'\u0430',
+ 'e': u'\u0435',
+ 'h': u'\u04bb',
+ 'j': u'\u0458',
+ 'p': u'\u0440',
+ 's': u'\u0455',
+ 'w': u'\u0461'}
+print ''.join([d[x] if x in d else x for x in 'Longpoke'])
+</pre>
+<p>These homoglyphs I found work well. You can find more of course. I tried stacking combining diatrical marks (zalgo text) and using right to left override, etc, but they seem to be blocked/filtered. Check the logs to see whether your chosen name was accepted. It can only be something like 30 chars long. Even if the devs catch onto homoglyphs, you can just put weird symbols that nobody knows for your name, or compose it entirely out of combining diatrical marks. The only way they'd be able to find you from a report is looking through all the non-standard named players, or using OCR on a screenshot submitted to them, which probably doesn't exist for obscure characters in this font.</p>
+
+<h3>Server chat messages, color chat messages</h3>
+<p>Press alt+i or check the "Server message" checkbox. Color text can be done without any hack. Just type <code>[rrggbb] message</code>. For example, <code>[ff0000] red</code>, <code>[0000ff] blue</code>, or <code>[ff00ff] purple</code>.</p>
+<img src="99295c62307092ed5ec59aab1154026a4799c3063ef89d462b8390637bebc117.png"/>
+<img src="6be2c5193235f2f6393021da4fedf88fdbf926a0458dcfcb9661a65a93d44386.png"/>
+
+<h3>View player ping and state packet (PlayerState) rate</h3>
+<p>The player list window shows the each player's ping as reported by the server and each player's packet rate. Your packet rate is calculated by the number of PlayerState packets you send per second. Other players' packet rates are calculated by the number of PlayerState packets you receive from the server with their ID per second. If you put someone in god mode, you'll see both your packet rate and his packet rate increase by approximately 13 (the value of StateSync.replayRateLimit). If you put someone in ghost mode, you'll only see your packet rate increase for a small period of time, and whenever a new player joins the game.</p>
+
+<h3>Take all the bases</h3>
+<p>Each base is represented in the main hack menu by 3 buttons in a row such as I O A, I O B, I O C, etc. Presing I tells the server you're on the base. Pressing O tells it you're off. A, B, C, etc are the names IIRC.</p>
+
+<video src="73de3c76cb41ec7823d82d1fcb5a841742f015ddc2e5a4618bb907ef3cd2543b.mp4" controls></video>
+
+<h3>Lock up player (DoS)</h3>
+<p>Turn on god mode for the player, enable rapidfire and infinite ammo, shoot him a lot (easy to do if you turn him into a ghost and teleport his body to where you are). You'll see his packet rate in the player list drop to 0 eventually.</p>
+
+<h3>Use any player's character / items</h3>
+<p>Just click on the player's "loadout id" in the player list and respawn. You are now the same character as him. You can copy this loadout id from the loadout override textbox in the main hack menu and save it, and use it whenever you want. It's buggy as hell. The first game you used the loadout in will just get stuck when it ends and you'll have to manually quit, but the next games you join will work. I think this makes you give experience to the player's character instead of any of yours. If you're on a new account, you can just manually enter a loadout id into the loadout override textbox and you can join high level games once you join a noob match as this character and quit. You can also use high level characters in low level rooms and vice versa.</p> 
+
+<center>
+<img src="22a602000725691fe5d1dbf915a91001118f014a20c1625d14b6e9e4b34769ca.png"/>
+<br />Level 30 in noob room<br /><br />
+<video src="4f5a405e11569367d04f32c07ea124ba2313f8c2cdedcffc1ac6537951ab0a72.mp4" controls></video>
+<br />Stealing a loadout
+</center>
+
+<p>The way this is implemented is when you press "respawn", your game sends a ReadyToSpawnRequestEvent over the ElectroServer TCP channel. This contains a "loadout id", which is a hex string which globally identifies the loadout (each character has at least one loadout which is the choice of weapons/items it's using) you'll spawn with. You can set your loadout id to the loadout id of any other player. To find a way to get other players' loadout ids, I just got two players to join a room, wrote down player A's loadout id, dumped all the EsObjects (various objects in the game are serialized to/from EsObject which is that JSON-like object I was talking about before) which player B received to strings, and searched (ctrl+f) for player A's loadout id in player B's received data. Unsurprisingly it was there. It turns out some EsObjects include a serialized GameLoadout object. That EsObject has a key "b" whose value is the loadout id of the player who the EsObject is describing. It's not actually used anywhere in the code, but now it is, for stealing people's loadouts.</p>
+
+<h3>Player name copying</h3>
+<p>Just copy the target's name and replace some of the characters with homoglyphs, or add invisible characters, etc.</p>
+
+<h3>Bypass profanity filter</h3>
+<p>I haven't added a feature to the hack for this but it's easy to add. Chat filtering is only done on your client before you send out the message. You can simply disable the check and everyone will see your profanity. Of course if you join the game room chat directly with an XMPP client, you are not subject to the filter as well.</p>
+
+<h3>Chat as any player in the match. Join any match's chat even if you're not in it</h3>
+<p>Just get an XMPP client and connect to the game chat server. Note that in XMPP, a chat server has a separate user or host thing (I don't even know anymore) that hosts all the multi user chats. Its address is conference.&lt;domain of the chat server&gt;. The XMPP room name of the match you're in is listed in the main hack menu. Your username and password are the rum gukey of the player you want to be. Logging in to chat as your target user logs him out. I don't know to what extent this disconnects him from chat. You need to also set your name in the chat room to the rum gukey of the player you want to be. For fun, get an XMPP library and script joining all the rooms at once or something.</p>
+
+<center>
+  <img src="42b7be43c66912055bfc28ad788baeba3e369f8ddcadb6e0d775ab0933c7ce9d.png"/><br />
+  logged into XMPP as micolaj<br /><br />
+<img src="d94b85f13a06bddce474132a67d0fcfd3fe57b613552ba4220c51a3ac98e24c2.png"/><br />
+joining a chat room with the Psi XMPP client
+</center>
+
+<h2>Development</h2>
+<p>I've coded the entire hack using .NET Reflector and reflexil. It's pretty painful, but not as bad as coding Java in Eclipse. You can see all the changes I made by diffing the original game and my hacked version. The easiest way I've found to do this is extract source from both assemblies using .NET Reflector and diff the two exported directories. Unfortunately, .NET Reflector/reflexil reordered some stuff when I saved my changes, so there's a bunch of bogus changes as well. My code Alpha quality and is filled with misleading variable names and un refactored code because it's too much trouble to fix them in Reflector. To obtain the main assembly (Assembly-CSharp.dll) in the first place, you need to unpack game.unity3d. This can be done by running <code>disunity bundle-extract game.unity3d</code> (WARNING: it will make a folder called "game" in the folder you run the command from and spam it with files). You can make changes in .NET Reflector with the reflexil plugin. You can copy your modified Assembly-CSharp.dll back into game.unity3d by running <code>disunity bundle-inject game.unity3d game</code> from the folder containing game.unity3d and the extracted "game" folder which contains your modified Assembly-CSharp.dll. You can of course modify/replace any of those dlls if needed.</p>
+
+<p>When developing, you can enable dev mode in Unity. This makes the error logs show up at the bottom of the game window (dunno what else it does, I just use it for this). Press alt+right click on the game window within the web browser. Then select Release Channel -&gt; Development (this will restart the game).</p>
+
+<h2>Ideas and stuff I didn't get around to</h2>
+<ul>
+  <li>Anti kick. I can't believe I didn't find a way to do this. I'm sure there's a way. A vote against me passed once but I wasn't kicked. I've seen it happen to other people too including people I've ghosted.</li>
+  <li>Noclip and fly hack. easy I've seen people using it</li>
+  <li>speed hack. tag/radar/wallhack. easy</li>
+  <li>Make the ghosts colored based on team, and have special tags/radar marks</li>
+  <li>You can DoS all players in the game by spamming the nade cluster button. Nade packets are obviously trivially small, but processing all the explosions occupies the game very fast. It seems to just queue all the explosions and process them one by one, which will take ages. The problem is you'll DoS yourself too. You could easily fix this by disabling nade explosions on your client.</li>
+  <li>Automate the DoS of a single player. I've briefly tried to do this by turning on the hit spam on a target player for 0 damage, but it doesn't work for some reason. Perhaps it has to be a non grenade hit or a headshot, or maybe the rate has to be higher (the current max rate is one packet per frame). If it has to be a non grenade hit, you'd have to automate teleporting the player in front of you and shoot him to avoid OPK detection</li>
+  <li>Be able to actually spawn in level 16+ games when you use someone's level 16+ character. This currently doesn't work for some reason and I haven't investigated it. It's probably just because a bunch of invariants in the client are broken when you do this... you can probably fix it. You can join the game but for some reason you can't spawn (you can probably still OPK people though).</li>
+  <li>Remove the god damn menu music. I tried to figure out how to do this twice, but I couldn't find an easy way. I think it's just part of some component in one of the asset bundle component trees, rather than being started explicitly in the code somewhere. I dunno a good way to reverse enginner the asset bundles.</li>
+  <li>Remove the god damn lockbox opening animations. That shit takes like minutes every time a game ends, and a game is only a few minutes in the first place</li>
+  <li>Make the nades you launch from people do NaN damage so they kill whoever they hit (optionally not including the player you're launching the nades from). Should be easy to implement</li>
+  <li>Decompile mono's lambdas/coroutines/switches. I've tried using cecil to map the compiled code names from mono's convention to the Microsoft C# compiler's convention, but it seems like cecil misses renaming some call sites. I haven't investigated this any further, but it would help a lot for hacking other Unity games.</li>
+  <li>Extracting source and rebuilding the entire assembly. This would make development much easier. You'd need to make the above work if you dont want to rename ~50-100 coroutines by hand. Apparently people have recompiled the game Terraria from scratch, so there's some proof that it's feasible. .NET Reflector decompiles some bytecode into invalid C# code, so you'd have to report a bug and wait, or fix these by hand. Since it's buggy there's no doubt that it will also decompile bytecode to valid but incorrect C# code and the game will crash/bug at runtime. You'd have to track down these instances and fix them by hand. Maybe other decompilers are less buggy. Note that some of the decompilers don't decompile lambdas/coroutines/etc.</li>
+  <li>A compromise of the above would be to load your own DLL into the game and only change the parts of the game you absolutely have to (add hooks, make small code modifications, etc). This would still be better than what I'm doing now (editing the code in .NET Reflector/reflexil).</li>
+  <li>Yet another alternative to improve hacking Unity games would be to improve Reflector/reflexil. Some badly needed features are the ability to automatically created fields that don't exist yet and automatically adding imports when editing code. You also shouldn't have to copy/paste the existing code into the compiler window before editing it. There are also various annoyances where you have to manually edit bytecode, which could be fixed. Also fixing the brace highlighting would help a lot. You could also easily automate the diffing of two assemblies.</li>
+  <li>There's a rotation quaternion stored in the PlayerState class. It would be nice to make players appear spinning/upside down, but I don't think the serialized format can express any rotations aside from around the Y axis (which just lets the player spin in the normal direction)</li>
+  <li>Nade spam blaming could be automated instead of having to press a button for each nade, and done for any number of players. Nade packets aren't subject to harsh ratre limits that apply to PlayerState. Also it would be funny to drop nades over every player, revealing where they are</li>
+</ul>
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v2
+
+iQIcBAEBAgAGBQJVYGM4AAoJED/g+l2lkwefSVQQANGHma6q65BKseL5Jgheg+VG
+tkY9wcpAv+oRO1cPXuV+wl5q18a7fa7QDBNFgDlSXEaHXqv3fzLDAC5sMXy6QO6C
+i2GazQDAMHItlzOZBvnEeXZpMULwXfSWBioGbcxQ0I5h8KElbFU0xwT5t8ZYqq1C
+tUsYdGqSNaW3ZCBbOdaE7TSK0iYcy7XyOtrvK41oyLoorzAq16fEqbPCjHECDj7t
+k/g7K/QGWMtkYHeDL8C7b+qoYILYmblJzcT1cUgkyNKnqev80Q+zeos1Zu6+ocmi
+e6LFr5XBmNfKwQuI99QdEYaEzMODOdIgIcz9p9gKrVsOZ5OwBbOtsMY883psAzao
+5tHm0brqLO/HX3SfhSYO/FEEi5TZjhFfX3bq8KDYYXbJCF13lpwV8X5xZfdm1Mia
+0N+ozp38U2cA2/mOKswlBwB1QnEZrFl8WqA6kYQ35tOJZUp2SpsqQ57g9fMzOkhX
+LIU2/M8aGZq3EhMYy36cBdaXBafeg7SeWNXuFXlRaGZi3t80v0HqXIFQFBowkrHL
++s/63sV9O6Uy9tGEdIIDAGPKwf2MpS2ej6rmOTST7bRCwQ7WBcPVZu79ZRqkrRf1
+3tA1VaZ2HiyGdFXlbidQCxh26ngKN3n0gv25w/n/Ck41g0KyjJWmNfd7CZAKyx/q
+9xfLwd67D0YSmBh+wpgz
+=OYjR
+-----END PGP SIGNATURE-----
